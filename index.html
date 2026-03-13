@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🪨</text></svg>">
+  <meta charset="utf-8">
+  <title></title>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: sans-serif; max-width: 640px; margin: 60px auto; padding: 0 20px; color: #333; }
+    a { color: #7c3aed; }
+    #tool textarea {
+      width: 100%;
+      font-size: 14px;
+      padding: 10px 14px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      resize: vertical;
+      outline: none;
+    }
+    #tool textarea:focus { border-color: #aaa; }
+    #results { margin-top: 20px; display: flex; flex-direction: column; gap: 16px; }
+    .result-block { display: none; }
+    .result-block.visible { display: block; }
+    .result-label { font-size: 12px; font-weight: 600; color: #888; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px; }
+    .result-desc { font-size: 11px; color: #aaa; margin-bottom: 4px; }
+    .result-row {
+      display: flex;
+      align-items: center;
+      background: #1e1e1e;
+      border-radius: 6px;
+      padding: 10px 14px;
+      gap: 10px;
+    }
+    .result-row pre {
+      margin: 0;
+      flex: 1;
+      font-size: 13px;
+      color: #d4d4d4;
+      white-space: pre-wrap;
+      word-break: break-all;
+      font-family: monospace;
+    }
+    .result-row button {
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 18px;
+      padding: 0;
+      line-height: 1;
+      flex-shrink: 0;
+      color: #888;
+    }
+    .result-row button:hover { color: #d4d4d4; }
+    #open-link {
+      display: none;
+      margin-top: 16px;
+      background: #1e1e1e;
+      border-radius: 6px;
+      padding: 16px 20px;
+      text-align: center;
+      font-size: 18px;
+      color: #d4d4d4;
+      text-decoration: none;
+    }
+    #open-link:hover { background: #2a2a2a; color: #fff; }
+    #open-link.visible { display: block; }
+  </style>
+</head>
+<body>
+  <div id="info"></div>
+  <script>
+    const raw = location.search
+
+    if (!raw) {
+      document.title = 'Obsidian Redirector'
+      document.getElementById('info').innerHTML =
+        '<div id="tool">' +
+          '<textarea id="input" rows="3" placeholder="Paste obsidian:// URL here"></textarea>' +
+          '<div id="results">' +
+            '<div class="result-block" id="block-md"><div class="result-label">Markdown</div><div class="result-row"><pre id="pre-md"></pre><button onclick="copyPre(\'md\')">⧉</button></div></div>' +
+            '<div class="result-block" id="block-html"><div class="result-label">HTML</div><div class="result-row"><pre id="pre-html"></pre><button onclick="copyPre(\'html\')">⧉</button></div></div>' +
+            '<div class="result-block" id="block-url"><div class="result-label">Plain text</div><div class="result-row"><pre id="pre-url"></pre><button onclick="copyPre(\'url\')">⧉</button></div></div>' +
+            '<div class="result-block" id="block-ghmd"><div class="result-label">Github Markdown</div><div class="result-desc">Spaces in link label replaced with _ to avoid GitHub parsing issues</div><div class="result-row"><pre id="pre-ghmd"></pre><button onclick="copyPre(\'ghmd\')">⧉</button></div></div>' +
+          '</div>' +
+          '<a id="open-link" href="#"></a>' +
+        '</div>'
+
+      const inputEl = document.getElementById('input')
+      inputEl.addEventListener('input', updateResults)
+      inputEl.focus()
+      setTimeout(() => {
+        updateResults()
+        if (inputEl.value.trim()) inputEl.blur()
+      }, 100)
+    } else {
+      let target
+
+      if (raw.startsWith('?o=')) {
+        target = raw.slice(3)
+      } else {
+        target = "obsidian://open" + raw
+      }
+
+      const obsidianParams = new URLSearchParams(target.replace(/^obsidian:\/\/open\??/, ''))
+      const vault = obsidianParams.get('vault') || '?'
+      const file = obsidianParams.get('file') || '?'
+
+      document.title = vault + ':' + file
+
+      document.getElementById('info').innerHTML =
+        '<p>Opening file <strong>' + file + '</strong> in vault <strong>' + vault + '</strong>...</p>' +
+        '<p><a href="' + target + '">Click here if Obsidian did not open</a></p>'
+
+      window.location.href = target
+    }
+
+    function updateResults() {
+      const obsidianUrl = document.getElementById('input').value.trim()
+      const show = !!obsidianUrl
+
+      document.getElementById('block-md').classList.toggle('visible', show)
+      document.getElementById('block-html').classList.toggle('visible', show)
+      document.getElementById('block-url').classList.toggle('visible', show)
+      document.getElementById('block-ghmd').classList.toggle('visible', show)
+
+      if (!show) return
+
+      const redirectUrl = location.origin + location.pathname + '?o=' + obsidianUrl
+      const obsidianParams = new URLSearchParams(obsidianUrl.replace(/^obsidian:\/\/open\??/, ''))
+      const file = obsidianParams.get('file') || obsidianUrl
+
+      document.getElementById('pre-md').textContent = '[' + file + '](' + redirectUrl + ')'
+      document.getElementById('pre-html').textContent = '<a href="' + redirectUrl + '">' + file + '</a>'
+      document.getElementById('pre-url').textContent = redirectUrl
+      document.getElementById('pre-ghmd').textContent = '[' + file.replace(/ /g, '_') + '](' + redirectUrl + ')'
+
+      const link = document.getElementById('open-link')
+      link.href = redirectUrl
+      link.textContent = 'Open ' + file + ' in ' + (obsidianParams.get('vault') || '?')
+      link.classList.toggle('visible', show)
+    }
+
+    function copyPre(format) {
+      navigator.clipboard.writeText(document.getElementById('pre-' + format).textContent)
+    }
+  </script>
+</body>
+</html>
